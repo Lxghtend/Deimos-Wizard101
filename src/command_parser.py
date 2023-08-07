@@ -178,6 +178,14 @@ async def parse_command(clients: List[Client], command_str: str):
                         case 'closestmob' | 'mob':
                             await asyncio.gather(*[SprintyClient(p).tp_to_closest_mob() for p in clients])
 
+                        case 'pet':
+                            xyzs = []
+                            for client in clients:
+                                client_xyzs, _ = await parse_location(split_command, client=client)
+                                xyzs.append(client_xyzs[0])
+
+                            await asyncio.gather(*[client.pet_teleport(xyz) for client, xyz in zip(clients, xyzs)])
+
                         case 'quest' | 'questpos' | 'questposition':
                             await asyncio.gather(*[p.teleport(await clients[0].quest_position.position()) for p in clients])
 
@@ -327,6 +335,14 @@ async def parse_command(clients: List[Client], command_str: str):
                 case 'entitytp' | 'entityteleport':
                     # Teleports to a specific entity by vague name
                     await asyncio.gather(*[SprintyClient(client).tp_to_closest_by_vague_name(split_command[2]) for client in clients])
+
+                case 'petentitynametp' | 'petentitynameteleport':
+                    # Teleports to a specific entity by name
+                    await asyncio.gather(*[SprintyClient(client).pet_teleport_to_closest_by_name(split_command[2]) for client in clients])
+                
+                case 'petentitytp' | 'petentityteleport':
+                    # Teleports to a specific entity by vague name
+                    await asyncio.gather(*[SprintyClient(client).pet_teleport_to_closest_by_vague_name(split_command[2]) for client in clients])
 
                 case 'tozone' | 'to_zone':
                     # Navigates to a specific zone, by vague name

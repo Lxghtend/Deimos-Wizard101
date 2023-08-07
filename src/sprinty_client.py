@@ -126,6 +126,20 @@ class SprintyClient():
 				closest = w
 		return closest
 
+	async def pet_find_closest_of_entities(self, entities: List[DynamicClientObject], only_safe: bool = False) \
+            -> Optional[DynamicClientObject]:
+		closest = None
+		smallest_dist = 0
+		self_pos = await self.client.client_object.location()
+		if only_safe:
+			entities = await self.find_safe_entities_from(entities)
+		for w in entities:
+			dist = self_pos.distance(await w.location())
+			if closest is None or dist < smallest_dist:
+				smallest_dist = dist
+				closest = w
+		return closest 
+
 
 	async def find_closest_by_predicate(self, pred: Callable, only_safe: bool = False, excluded_ids: Set[int] = None) -> Optional[DynamicClientObject]:
 		return await self.find_closest_of_entities(await self.get_base_entities_with_predicate(pred, excluded_ids), only_safe)
@@ -134,10 +148,15 @@ class SprintyClient():
 	async def find_closest_by_name(self, name: str, only_safe: bool = False, excluded_ids: Set[int] = None) -> Optional[DynamicClientObject]:
 		return await self.find_closest_of_entities(await self.get_base_entities_with_name(name, excluded_ids), only_safe)
 
+	async def pet_find_closest_by_name(self, name: str, only_safe: bool = False, excluded_ids: Set[int] = None) -> Optional[DynamicClientObject]:
+		return await self.pet_find_closest_of_entities(await self.pet_get_base_entities_with_name(name, excluded_ids), only_safe)
+
 
 	async def find_closest_by_vague_name(self, name: str, only_safe: bool = False, excluded_ids: Set[int] = None) -> Optional[DynamicClientObject]:
 		return await self.find_closest_of_entities(await self.get_base_entities_with_vague_name(name, excluded_ids), only_safe)
 
+	async def pet_find_closest_by_vague_name(self, name: str, only_safe: bool = False, excluded_ids: Set[int] = None) -> Optional[DynamicClientObject]:
+		return await self.pet_find_closest_of_entities(await self.get_base_entities_with_vague_name(name, excluded_ids), only_safe)
 
 	async def find_closest_health_wisp(self, only_safe: bool = False, excluded_ids: Set[int] = None) -> Optional[DynamicClientObject]:
 		return await self.find_closest_of_entities(await self.get_health_wisps(excluded_ids), only_safe)
@@ -164,10 +183,15 @@ class SprintyClient():
 				return False
 		return False
 
-
 	async def tp_to_closest_of(self, entities: List[DynamicClientObject], only_safe: bool = False):
 		if e := await self.find_closest_of_entities(entities, only_safe):
 			await self.client.teleport(await e.location())
+			return True
+		return False
+
+	async def pet_tp_to_closest_of(self, entities: List[DynamicClientObject], only_safe: bool = False):
+		if e := await self.pet_find_closest_of_entities(entities, only_safe):
+			await self.client.pet_teleport(await e.location())
 			return True
 		return False
 
@@ -178,13 +202,23 @@ class SprintyClient():
 			return True
 		return False
 
+	async def pet_tp_to_closest_by_name(self, name: str, only_safe: bool = False, excluded_ids: Set[int] = None) -> bool:
+		if e := await self.pet_find_closest_by_name(name, only_safe, excluded_ids):
+			await self.client.pet_teleport(await e.location())
+			return True
+		return False
+
+	async def pet_teleport_to_closest_by_vague_name(self, name: str, only_safe: bool = False, excluded_ids: Set[int] = None) -> bool:                                          
+		if e := await self.pet_find_closest_by_vague_name(name, only_safe, excluded_ids):
+			await self.client.pet_teleport(await e.location())
+			return True
+		return False
 
 	async def tp_to_closest_by_vague_name(self, name: str, only_safe: bool = False, excluded_ids: Set[int] = None) -> bool:
 		if e := await self.find_closest_by_vague_name(name, only_safe, excluded_ids):
 			await self.client.teleport(await e.location())
 			return True
 		return False
-
 
 	async def tp_to_closest_health_wisp(self, only_safe: bool = False,
 										excluded_ids: Set[int] = None) -> bool:
