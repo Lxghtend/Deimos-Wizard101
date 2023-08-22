@@ -400,6 +400,7 @@ async def navigate_to_ravenwood(client: Client):
 
 async def navigate_to_commons_from_ravenwood(client: Client):
 	# walk to ravenwood exit
+	await asyncio.sleep(1)
 	await client.goto(-19.549846649169922, -297.7527160644531)
 	await client.goto(-5.701, -1536.491)
 	current_zone = await client.zone_name()
@@ -527,6 +528,8 @@ async def auto_potions_force_buy(client: Client, mark: bool = False, minimum_man
 				await client.send_key(Keycode.PAGE_DOWN, 0.1)
 		# Navigate to ravenwood
 		await navigate_to_ravenwood(client)
+		# Wait a second before going to commons cuz sometimes it gets stuck - Lxghtend
+		await asyncio.sleep(1)
 		# Navigate to commons
 		await navigate_to_commons_from_ravenwood(client)
 		# Navigate to hilda brewer
