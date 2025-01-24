@@ -3,6 +3,7 @@ import gettext
 import queue
 import re
 import PySimpleGUI as gui
+import webbrowser
 from src.combat_objects import school_id_to_names
 from src.paths import wizard_city_dance_game_path
 from src.utils import assign_pet_level
@@ -40,6 +41,8 @@ class GUICommandType(Enum):
 	ExecuteBot = auto()
 	KillBot = auto()
 
+	SetPlaystyles = auto()
+
 	# SetPetWorld = auto()
 
 	SetScale = auto()
@@ -59,6 +62,7 @@ class GUIKeys:
 	toggle_sigil = "togglesigil"
 	toggle_questing = "toggle_questing"
 	toggle_auto_pet = "toggleautopet"
+	toggle_auto_potion = "toggleautopotion"
 	toggle_freecam = "togglefreecam"
 	toggle_camera_collision = "togglecameracollision"
 
@@ -93,11 +97,14 @@ class GUIKeys:
 	button_set_distance = "buttonsetdistance"
 	button_view_stats = "buttonviewstats"
 	button_swap_members = "buttonswapmembers"
+
 	button_execute_flythrough = "buttonexecuteflythrough"
 	button_kill_flythrough = "buttonkillflythrough"
 	button_run_bot = "buttonrunbot"
 	button_kill_bot = "buttonkillbot"
+	button_set_playstyles = "buttonsetplaystyles"
 	button_set_scale = "buttonsetscale"
+	button_open_gen_site = "buttonopengensite"
 
 
 class GUICommand:
@@ -137,7 +144,8 @@ def create_gui(gui_theme, gui_text_color, gui_button_color, tool_name, tool_vers
 		(tl('Dialogue'), GUIKeys.toggle_dialogue),
 		(tl('Sigil'), GUIKeys.toggle_sigil),
 		(tl('Questing'), GUIKeys.toggle_questing),
-		(tl('Auto Pet'), GUIKeys.toggle_auto_pet)
+		(tl('Auto Pet'), GUIKeys.toggle_auto_pet),
+		(tl('Auto Potion'), GUIKeys.toggle_auto_potion),
 	]
 	hotkeys: list[tuple[str, str]] = [
 		(tl('Quest TP'), GUIKeys.hotkey_quest_tp),
@@ -210,7 +218,8 @@ def create_gui(gui_theme, gui_text_color, gui_button_color, tool_name, tool_vers
 		[gui.Text(dev_utils_notice, text_color=gui_text_color)],
 		[
 			hotkey_button(tl('Copy Entity List'), GUIKeys.copy_entity_list, True),
-			hotkey_button(tl('Copy UI Tree'), GUIKeys.copy_ui_tree, True)
+			hotkey_button(tl('Copy UI Tree'), GUIKeys.copy_ui_tree, True),
+			hotkey_button(tl('Open Path Generator'), GUIKeys.button_open_gen_site, True)
 		],
 		[
 			gui.Text(tl('Zone Name') + ':', text_color=gui_text_color), gui.InputText(size=(13, 1), key='ZoneInput'),
@@ -269,7 +278,6 @@ def create_gui(gui_theme, gui_text_color, gui_button_color, tool_name, tool_vers
 
 	framed_camera_controls_layout = gui.Frame(tl('Camera Controls'), camera_controls_layout, title_color=gui_text_color)
 
-	# UNFINISHED - slack
 	stat_viewer_layout = [
 		[gui.Text(dev_utils_notice, text_color=gui_text_color)],
 		[gui.Text(tl('Caster/Target Indices') + ':', text_color=gui_text_color), gui.Combo([i + 1 for i in range(12)], text_color=gui_text_color, size=(21, 1), default_value=1, key='EnemyInput', readonly=True), gui.Combo([i + 1 for i in range(12)], text_color=gui_text_color, size=(21, 1), default_value=1, key='AllyInput', readonly=True)],
@@ -322,6 +330,20 @@ def create_gui(gui_theme, gui_text_color, gui_button_color, tool_name, tool_vers
 
 	framed_bot_creator_layout = gui.Frame(tl('Bot Creator'), bot_creator_layout, title_color=gui_text_color)
 
+	combat_config_layout = [
+		[gui.Text(dev_utils_notice, text_color=gui_text_color)],
+		[gui.Multiline(key='combat_config', size=(66, 11), text_color=gui_text_color, horizontal_scroll=True)],
+		[
+			gui.Input(key='combat_file_path', visible=False), 
+			gui.FileBrowse('Import Playstyle', file_types=(("Text Files", "*.txt"),), auto_size_button=True, button_color=(gui_text_color, gui_button_color)),
+			gui.Input(key='combat_save_path', visible=False),
+			gui.FileSaveAs('Export Playstyle', file_types=(("Text Files", "*.txt"),), auto_size_button=True, button_color=(gui_text_color, gui_button_color)),
+			hotkey_button(tl('Set Playstyles'), GUIKeys.button_set_playstyles, True),
+		],
+	]
+
+	framed_combat_config_layout = gui.Frame(tl('Combat Configurator'), combat_config_layout, title_color=gui_text_color)
+
 	misc_utils_layout = [
 		[gui.Text(dev_utils_notice, text_color=gui_text_color)],
 		[
@@ -341,6 +363,7 @@ def create_gui(gui_theme, gui_text_color, gui_button_color, tool_name, tool_vers
 			gui.Tab(tl('Stat Viewer'), [[framed_stat_viewer_layout]], title_color=gui_text_color),
 			gui.Tab(tl('Flythrough'), [[framed_flythrough_layout]], title_color=gui_text_color),
 			gui.Tab(tl('Bot'), [[framed_bot_creator_layout]], title_color=gui_text_color),
+			gui.Tab(tl('Combat'), [[framed_combat_config_layout]], title_color=gui_text_color),
 			gui.Tab(tl('Misc'), [[framed_misc_utils_layout]], title_color=gui_text_color)
 		]
 	]
@@ -393,7 +416,7 @@ def manage_gui(send_queue: queue.Queue, recv_queue: queue.Queue, gui_theme, gui_
 
 			# Toggles
 			case GUIKeys.toggle_speedhack | GUIKeys.toggle_combat | GUIKeys.toggle_dialogue | GUIKeys.toggle_sigil | \
-				GUIKeys.toggle_questing | GUIKeys.toggle_auto_pet | GUIKeys.toggle_freecam | \
+				GUIKeys.toggle_questing | GUIKeys.toggle_auto_pet | GUIKeys.toggle_auto_potion | GUIKeys.toggle_freecam | \
 				GUIKeys.toggle_camera_collision: 
 				send_queue.put(GUICommand(GUICommandType.ToggleOption, event))
 			
@@ -449,6 +472,10 @@ def manage_gui(send_queue: queue.Queue, recv_queue: queue.Queue, gui_theme, gui_
 						'Pitch': camera_inputs[5],
 					}))
 
+			case GUIKeys.button_open_gen_site:
+				path_generator_url = "https://sirolaf.github.io/wiz101uipath_page/"
+				webbrowser.open_new_tab(path_generator_url)
+
 			case GUIKeys.button_set_distance:
 				distance_inputs = [inputs['CamDistanceInput'], inputs['CamMinInput'], inputs['CamMaxInput']]
 				if any(distance_inputs):
@@ -495,6 +522,9 @@ def manage_gui(send_queue: queue.Queue, recv_queue: queue.Queue, gui_theme, gui_
 
 			case GUIKeys.button_run_bot:
 				send_queue.put(GUICommand(GUICommandType.ExecuteBot, inputs['bot_creator']))
+
+			case GUIKeys.button_set_playstyles:
+				send_queue.put(GUICommand(GUICommandType.SetPlaystyles, inputs["combat_config"]))
 
 			case GUIKeys.button_kill_bot:
 				send_queue.put(GUICommand(GUICommandType.KillBot))
@@ -548,5 +578,8 @@ def manage_gui(send_queue: queue.Queue, recv_queue: queue.Queue, gui_theme, gui_
 
 		import_check('bot_file_path', 'bot_creator')
 		export_check('bot_save_path', 'bot_creator')
+
+		import_check('combat_file_path', 'combat_config')
+		export_check('combat_save_path', 'combat_config')
 
 	window.close()
